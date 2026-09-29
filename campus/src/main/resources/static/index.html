@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusFind — Lost and Found Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .badge-available { background-color: #def7ec; color: #03543f; border: 1px solid #31c48d; }
+        .badge-claimed { background-color: #fef08a; color: #713f12; border: 1px solid #eab308; }
+        .badge-returned { background-color: #e1effe; color: #1e429f; border: 1px solid #76a9fa; }
+        .badge-student { background-color: #ede9fe; color: #5b21b6; }
+        .badge-staff { background-color: #e0f2fe; color: #0369a1; }
+        .badge-admin { background-color: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Top Navbar -->
+    <header class="bg-indigo-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand -->
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('dashboard')">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center shadow-md">
+                        <i class="fa-solid fa-magnifying-glass-location text-xl text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight">CampusFind</h1>
+                        <p class="text-xs text-indigo-200">Lost & Found Item Tracker</p>
+                    </div>
+                </div>
+
+                <!-- Active User Session / Role Switcher -->
+                <div class="flex items-center space-x-4">
+                    <div class="bg-indigo-800/80 px-3 py-1.5 rounded-lg border border-indigo-700 flex items-center space-x-3">
+                        <span class="text-xs text-indigo-300">Acting As:</span>
+                        <select id="currentUserSelect" onchange="onUserChange()" class="bg-indigo-950 text-white text-sm rounded px-2 py-1 border border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <!-- Populated dynamically -->
+                        </select>
+                        <span id="userRoleBadge" class="text-xs font-semibold px-2 py-0.5 rounded badge-admin">ADMIN</span>
+                    </div>
+
+                    <button onclick="openModal('modal-new-user')" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg transition flex items-center gap-1 shadow">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span class="hidden sm:inline">Add User</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Sub-bar -->
+        <div class="bg-indigo-950 border-t border-indigo-800 px-4 sm:px-6 lg:px-8">
+            <nav class="max-w-7xl mx-auto flex space-x-2 sm:space-x-8 overflow-x-auto py-2 text-sm font-medium">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-3 py-1.5 rounded-md text-white bg-indigo-800 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie"></i> Dashboard
+                </button>
+                <button onclick="switchTab('lost-reports')" id="nav-lost-reports" class="nav-btn px-3 py-1.5 rounded-md text-indigo-200 hover:text-white hover:bg-indigo-800/50 flex items-center gap-2">
+                    <i class="fa-solid fa-bullhorn"></i> Lost Reports
+                </button>
+                <button onclick="switchTab('found-items')" id="nav-found-items" class="nav-btn px-3 py-1.5 rounded-md text-indigo-200 hover:text-white hover:bg-indigo-800/50 flex items-center gap-2">
+                    <i class="fa-solid fa-box-open"></i> Found Items
+                </button>
+                <button onclick="switchTab('matcher')" id="nav-matcher" class="nav-btn px-3 py-1.5 rounded-md text-indigo-200 hover:text-white hover:bg-indigo-800/50 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Match Engine
+                </button>
+                <button onclick="switchTab('categories')" id="nav-categories" class="nav-btn px-3 py-1.5 rounded-md text-indigo-200 hover:text-white hover:bg-indigo-800/50 flex items-center gap-2">
+                    <i class="fa-solid fa-tags"></i> Categories
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ==================== TAB 1: DASHBOARD ==================== -->
+        <section id="tab-dashboard" class="tab-content">
+            <!-- Header & Action Row -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Campus Overview Dashboard</h2>
+                    <p class="text-sm text-slate-500">Live statistics & item status breakdown</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openModal('modal-new-lost')" class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 transition">
+                        <i class="fa-solid fa-plus"></i> Report Lost Item
+                    </button>
+                    <button onclick="openModal('modal-new-found')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 transition">
+                        <i class="fa-solid fa-hand-holding-hand"></i> Log Found Item
+                    </button>
+                    <button onclick="loadDashboard()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg transition" title="Refresh">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Metrics Cards Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <!-- Total Users -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-indigo-600 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Users</span>
+                        <i class="fa-solid fa-users text-lg"></i>
+                    </div>
+                    <span id="stat-totalUsers" class="text-2xl font-bold text-slate-800">0</span>
+                </div>
+                <!-- Categories -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-amber-600 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Categories</span>
+                        <i class="fa-solid fa-tags text-lg"></i>
+                    </div>
+                    <span id="stat-totalCategories" class="text-2xl font-bold text-slate-800">0</span>
+                </div>
+                <!-- Pending Lost Reports -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-rose-600 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Lost Reports</span>
+                        <i class="fa-solid fa-bullhorn text-lg"></i>
+                    </div>
+                    <span id="stat-pendingLostReports" class="text-2xl font-bold text-slate-800">0</span>
+                </div>
+                <!-- Available Found Items -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-emerald-600 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Available</span>
+                        <i class="fa-solid fa-box text-lg"></i>
+                    </div>
+                    <span id="stat-availableFoundItems" class="text-2xl font-bold text-emerald-600">0</span>
+                </div>
+                <!-- Claimed Items -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-yellow-600 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Claimed</span>
+                        <i class="fa-solid fa-handshake text-lg"></i>
+                    </div>
+                    <span id="stat-claimedFoundItems" class="text-2xl font-bold text-yellow-600">0</span>
+                </div>
+                <!-- Returned Items -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-blue-600 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Returned</span>
+                        <i class="fa-solid fa-circle-check text-lg"></i>
+                    </div>
+                    <span id="stat-returnedFoundItems" class="text-2xl font-bold text-blue-600">0</span>
+                </div>
+            </div>
+
+            <!-- Charts and Quick Lists Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Status Distribution Chart -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
+                    <h3 class="text-base font-semibold text-slate-700 w-full mb-4 flex items-center justify-between">
+                        <span>Found Item Status Ratio</span>
+                        <i class="fa-solid fa-chart-donut text-slate-400"></i>
+                    </h3>
+                    <div class="relative w-full max-w-[260px] aspect-square flex items-center justify-center">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent Lost Reports -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-base font-semibold text-slate-700">Recent Lost Reports</h3>
+                        <button onclick="switchTab('lost-reports')" class="text-xs text-indigo-600 hover:underline">View All</button>
+                    </div>
+                    <div id="recent-lost-list" class="space-y-3 flex-grow overflow-y-auto max-h-[280px]">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Recent Found Items -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-base font-semibold text-slate-700">Recent Found Items</h3>
+                        <button onclick="switchTab('found-items')" class="text-xs text-indigo-600 hover:underline">View All</button>
+                    </div>
+                    <div id="recent-found-list" class="space-y-3 flex-grow overflow-y-auto max-h-[280px]">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 2: LOST REPORTS ==================== -->
+        <section id="tab-lost-reports" class="tab-content hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Lost Item Reports</h2>
+                    <p class="text-sm text-slate-500">Items reported missing by students and staff</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openModal('modal-new-lost')" class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 transition">
+                        <i class="fa-solid fa-plus"></i> Report Lost Item
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap gap-4 items-center justify-between">
+                <div class="flex items-center gap-2 flex-grow max-w-md">
+                    <div class="relative w-full">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400"></i>
+                        <input type="text" id="lost-search-input" onkeyup="filterLostTable()" placeholder="Search description, location, or reporter..." class="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500">
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-500">Category:</span>
+                    <select id="lost-category-filter" onchange="filterLostTable()" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Lost Items Table -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-slate-100 text-slate-700 uppercase font-semibold text-xs border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4">#ID</th>
+                                <th class="py-3 px-4">Category</th>
+                                <th class="py-3 px-4">Description</th>
+                                <th class="py-3 px-4">Location</th>
+                                <th class="py-3 px-4">Date</th>
+                                <th class="py-3 px-4">Reported By</th>
+                                <th class="py-3 px-4 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lost-reports-tbody" class="divide-y divide-slate-100">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 3: FOUND ITEMS ==================== -->
+        <section id="tab-found-items" class="tab-content hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Found Items Log</h2>
+                    <p class="text-sm text-slate-500">Items logged by staff and kept securely</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openModal('modal-new-found')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 transition">
+                        <i class="fa-solid fa-plus"></i> Log Found Item
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap gap-4 items-center justify-between">
+                <div class="flex items-center gap-2 flex-grow max-w-md">
+                    <div class="relative w-full">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400"></i>
+                        <input type="text" id="found-search-input" onkeyup="filterFoundTable()" placeholder="Search description, location, or finder..." class="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-1">
+                        <span class="text-xs font-semibold text-slate-500">Status:</span>
+                        <select id="found-status-filter" onchange="filterFoundTable()" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">All Statuses</option>
+                            <option value="AVAILABLE">AVAILABLE</option>
+                            <option value="CLAIMED">CLAIMED</option>
+                            <option value="RETURNED">RETURNED</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="text-xs font-semibold text-slate-500">Category:</span>
+                        <select id="found-category-filter" onchange="filterFoundTable()" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Found Items Table -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-slate-100 text-slate-700 uppercase font-semibold text-xs border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4">#ID</th>
+                                <th class="py-3 px-4">Category</th>
+                                <th class="py-3 px-4">Description</th>
+                                <th class="py-3 px-4">Location</th>
+                                <th class="py-3 px-4">Current Status</th>
+                                <th class="py-3 px-4">Logged By</th>
+                                <th class="py-3 px-4 text-center">Lifecycle & Business Rule Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="found-items-tbody" class="divide-y divide-slate-100">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 4: SMART MATCHER ==================== -->
+        <section id="tab-matcher" class="tab-content hidden">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-slate-800">Smart Match Engine</h2>
+                <p class="text-sm text-slate-500">Cross-match open lost reports with logged found items by Category, Keywords & Location</p>
+            </div>
+
+            <!-- Search Filter Card -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+                <h3 class="text-base font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-indigo-600"></i> Match Search Criteria
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Select Category <span class="text-rose-500">*</span></label>
+                        <select id="match-category-select" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Keyword / Location</label>
+                        <input type="text" id="match-keyword-input" placeholder="e.g. Dell, Charger, Library, ID card" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <button onclick="runMatchSearch()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-2 rounded-lg shadow transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass"></i> Find Potential Matches
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Matches Result Container -->
+            <div id="match-results-container">
+                <div class="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">
+                    <i class="fa-solid fa-wand-magic-sparkles text-4xl mb-3 text-indigo-300"></i>
+                    <p class="text-sm font-medium">Select a category and click "Find Potential Matches" to view matching items.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 5: CATEGORIES ==================== -->
+        <section id="tab-categories" class="tab-content hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Category Management</h2>
+                    <p class="text-sm text-slate-500">Item categories used for tagging and matching</p>
+                </div>
+                <button onclick="openModal('modal-new-category')" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 transition">
+                    <i class="fa-solid fa-plus"></i> New Category
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="categories-grid">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        CampusFind &copy; 2026 — Lost & Found Item Tracker Backend & Dashboard
+    </footer>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Modal: Report Lost Item -->
+    <div id="modal-new-lost" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div class="bg-rose-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-bullhorn"></i> Report a Lost Item
+                </h3>
+                <button onclick="closeModal('modal-new-lost')" class="text-rose-200 hover:text-white text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleCreateLostReport(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Category <span class="text-rose-500">*</span></label>
+                    <select id="form-lost-category" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Item Description <span class="text-rose-500">*</span></label>
+                    <textarea id="form-lost-desc" required rows="3" placeholder="e.g. Blue Dell 65W charger with sticker..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Lost Location <span class="text-rose-500">*</span></label>
+                        <input type="text" id="form-lost-location" required placeholder="e.g. Library 2nd Floor" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Report Date <span class="text-rose-500">*</span></label>
+                        <input type="date" id="form-lost-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-new-lost')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow">Submit Report</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Log Found Item -->
+    <div id="modal-new-found" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div class="bg-emerald-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-box-open"></i> Log a Found Item
+                </h3>
+                <button onclick="closeModal('modal-new-found')" class="text-emerald-200 hover:text-white text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleCreateFoundItem(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Category <span class="text-emerald-500">*</span></label>
+                    <select id="form-found-category" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Item Description <span class="text-emerald-500">*</span></label>
+                    <textarea id="form-found-desc" required rows="3" placeholder="e.g. Found black calculator near desk..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Found Location <span class="text-emerald-500">*</span></label>
+                    <input type="text" id="form-found-location" required placeholder="e.g. Cafeteria Table 5" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+                <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+                    <i class="fa-solid fa-info-circle mr-1"></i> Status will be set to <strong>AVAILABLE</strong> by default.
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-new-found')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow">Log Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: New User -->
+    <div id="modal-new-user" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div class="bg-indigo-700 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i> Register New User
+                </h3>
+                <button onclick="closeModal('modal-new-user')" class="text-indigo-200 hover:text-white text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleCreateUser(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name <span class="text-rose-500">*</span></label>
+                    <input type="text" id="form-user-name" required placeholder="e.g. Jane Doe" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Email <span class="text-rose-500">*</span></label>
+                    <input type="email" id="form-user-email" required placeholder="e.g. jane@campus.edu" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Role <span class="text-rose-500">*</span></label>
+                    <select id="form-user-role" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="STUDENT">STUDENT</option>
+                        <option value="STAFF">STAFF</option>
+                        <option value="ADMIN">ADMIN</option>
+                    </select>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-new-user')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow">Register User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: New Category -->
+    <div id="modal-new-category" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div class="bg-amber-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-tag"></i> Create Category
+                </h3>
+                <button onclick="closeModal('modal-new-category')" class="text-amber-200 hover:text-white text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleCreateCategory(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Category Name <span class="text-rose-500">*</span></label>
+                    <input type="text" id="form-category-name" required placeholder="e.g. Electronics, Bags" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-new-category')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow">Save Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- App JavaScript Logic -->
+    <script>
+        const API_BASE = '/api';
+
+        // State variables
+        let appState = {
+            users: [],
+            currentUser: null,
+            categories: [],
+            lostReports: [],
+            foundItems: [],
+            statusChartInstance: null
+        };
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Set today's date in lost report form
+            const dateInput = document.getElementById('form-lost-date');
+            if (dateInput) dateInput.valueAsDate = new Date();
+
+            await loadInitialData();
+            loadDashboard();
+        });
+
+        // Load all entities
+        async function loadInitialData() {
+            try {
+                const [usersRes, catRes, lostRes, foundRes] = await Promise.all([
+                    fetch(`${API_BASE}/users`),
+                    fetch(`${API_BASE}/categories`),
+                    fetch(`${API_BASE}/lost-reports`),
+                    fetch(`${API_BASE}/found-items`)
+                ]);
+
+                appState.users = await usersRes.json();
+                appState.categories = await catRes.json();
+                appState.lostReports = await lostRes.json();
+                appState.foundItems = await foundRes.json();
+
+                populateUserDropdown();
+                populateCategoryDropdowns();
+                renderLostTable();
+                renderFoundTable();
+                renderCategoriesGrid();
+            } catch (err) {
+                console.error('Error loading initial data:', err);
+                showToast('Failed to connect to backend server. Make sure Spring Boot is running.', 'error');
+            }
+        }
+
+        // Populate User Selector in Navbar
+        function populateUserDropdown() {
+            const select = document.getElementById('currentUserSelect');
+            if (!select) return;
+            select.innerHTML = '';
+            
+            if (appState.users.length === 0) {
+                select.innerHTML = '<option value="">No Users</option>';
+                return;
+            }
+
+            appState.users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = `${u.name} (${u.role})`;
+                select.appendChild(opt);
+            });
+
+            // Default to first user or admin if available
+            if (!appState.currentUser) {
+                const admin = appState.users.find(u => u.role === 'ADMIN');
+                appState.currentUser = admin || appState.users[0];
+            }
+            select.value = appState.currentUser.id;
+            updateUserBadge();
+        }
+
+        function onUserChange() {
+            const select = document.getElementById('currentUserSelect');
+            const uid = parseInt(select.value);
+            appState.currentUser = appState.users.find(u => u.id === uid);
+            updateUserBadge();
+            showToast(`Switched active user to ${appState.currentUser.name} (${appState.currentUser.role})`, 'info');
+        }
+
+        function updateUserBadge() {
+            const badge = document.getElementById('userRoleBadge');
+            if (!badge || !appState.currentUser) return;
+            const role = appState.currentUser.role;
+            badge.textContent = role;
+            badge.className = `text-xs font-semibold px-2 py-0.5 rounded badge-${role.toLowerCase()}`;
+        }
+
+        // Populate Category Dropdowns
+        function populateCategoryDropdowns() {
+            const selects = [
+                document.getElementById('lost-category-filter'),
+                document.getElementById('found-category-filter'),
+                document.getElementById('match-category-select'),
+                document.getElementById('form-lost-category'),
+                document.getElementById('form-found-category')
+            ];
+
+            selects.forEach(sel => {
+                if (!sel) return;
+                const isFilter = sel.id.includes('filter');
+                sel.innerHTML = isFilter ? '<option value="">All Categories</option>' : '';
+
+                appState.categories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.id;
+                    opt.textContent = cat.name;
+                    sel.appendChild(opt);
+                });
+            });
+        }
+
+        // ==================== DASHBOARD ====================
+        async function loadDashboard() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/dashboard`);
+                const data = await res.json();
+
+                document.getElementById('stat-totalUsers').textContent = data.totalUsers ?? appState.users.length;
+                document.getElementById('stat-totalCategories').textContent = data.totalCategories ?? appState.categories.length;
+                document.getElementById('stat-pendingLostReports').textContent = data.pendingLostReports ?? appState.lostReports.length;
+                document.getElementById('stat-availableFoundItems').textContent = data.availableFoundItems ?? 0;
+                document.getElementById('stat-claimedFoundItems').textContent = data.claimedFoundItems ?? 0;
+                document.getElementById('stat-returnedFoundItems').textContent = data.returnedFoundItems ?? 0;
+
+                renderStatusChart(data.availableFoundItems, data.claimedFoundItems, data.returnedFoundItems);
+                renderRecentLists();
+            } catch (err) {
+                console.error('Error fetching dashboard metrics:', err);
+            }
+        }
+
+        function renderStatusChart(available = 0, claimed = 0, returned = 0) {
+            const chartElem = document.getElementById('statusChart');
+            if (!chartElem) return;
+            const ctx = chartElem.getContext('2d');
+            if (appState.statusChartInstance) {
+                appState.statusChartInstance.destroy();
+            }
+
+            appState.statusChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Available', 'Claimed', 'Returned'],
+                    datasets: [{
+                        data: [available, claimed, returned],
+                        backgroundColor: ['#10b981', '#eab308', '#3b82f6'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        function renderRecentLists() {
+            // Recent Lost
+            const lostList = document.getElementById('recent-lost-list');
+            if (lostList) {
+                lostList.innerHTML = '';
+                const recentLost = [...appState.lostReports].reverse().slice(0, 4);
+                if (recentLost.length === 0) {
+                    lostList.innerHTML = '<p class="text-xs text-slate-400 italic">No lost reports yet.</p>';
+                } else {
+                    recentLost.forEach(item => {
+                        lostList.innerHTML += `
+                            <div class="p-2.5 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between">
+                                <div>
+                                    <h4 class="text-xs font-semibold text-slate-800">${escapeHtml(item.description)}</h4>
+                                    <p class="text-[11px] text-slate-500"><i class="fa-solid fa-location-dot text-rose-500 mr-1"></i>${escapeHtml(item.location)}</p>
+                                </div>
+                                <span class="text-[10px] px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-medium">${item.category?.name || 'Item'}</span>
+                            </div>
+                        `;
+                    });
+                }
+            }
+
+            // Recent Found
+            const foundList = document.getElementById('recent-found-list');
+            if (foundList) {
+                foundList.innerHTML = '';
+                const recentFound = [...appState.foundItems].reverse().slice(0, 4);
+                if (recentFound.length === 0) {
+                    foundList.innerHTML = '<p class="text-xs text-slate-400 italic">No found items yet.</p>';
+                } else {
+                    recentFound.forEach(item => {
+                        foundList.innerHTML += `
+                            <div class="p-2.5 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between">
+                                <div>
+                                    <h4 class="text-xs font-semibold text-slate-800">${escapeHtml(item.description)}</h4>
+                                    <p class="text-[11px] text-slate-500"><i class="fa-solid fa-location-dot text-emerald-500 mr-1"></i>${escapeHtml(item.location)}</p>
+                                </div>
+                                <span class="text-[10px] px-2 py-0.5 rounded font-semibold badge-${item.status.toLowerCase()}">${item.status}</span>
+                            </div>
+                        `;
+                    });
+                }
+            }
+        }
+
+        // ==================== LOST REPORTS ====================
+        function renderLostTable() {
+            const tbody = document.getElementById('lost-reports-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (appState.lostReports.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 italic">No lost reports found.</td></tr>';
+                return;
+            }
+
+            appState.lostReports.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+                tr.dataset.category = r.category?.id || '';
+                tr.dataset.text = `${r.description} ${r.location} ${r.reporter?.name}`.toLowerCase();
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs text-slate-500">#${r.id}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium text-xs">${escapeHtml(r.category?.name || 'N/A')}</span></td>
+                    <td class="py-3 px-4 font-medium text-slate-800">${escapeHtml(r.description)}</td>
+                    <td class="py-3 px-4 text-slate-600"><i class="fa-solid fa-location-dot text-rose-500 mr-1 text-xs"></i>${escapeHtml(r.location)}</td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${r.reportDate || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                        <span class="font-medium text-slate-700">${escapeHtml(r.reporter?.name || 'N/A')}</span>
+                        <span class="text-[10px] text-slate-400 block">${escapeHtml(r.reporter?.role || '')}</span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="findMatchesForReport(${r.id}, ${r.category?.id}, '${escapeHtml(r.description)}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-2.5 py-1 rounded-md border border-indigo-200 transition flex items-center gap-1 mx-auto">
+                            <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i> Match
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterLostTable() {
+            const query = document.getElementById('lost-search-input').value.toLowerCase();
+            const catFilter = document.getElementById('lost-category-filter').value;
+            const rows = document.querySelectorAll('#lost-reports-tbody tr');
+
+            rows.forEach(r => {
+                const matchCat = !catFilter || r.dataset.category === catFilter;
+                const matchText = !query || r.dataset.text.includes(query);
+                r.style.display = (matchCat && matchText) ? '' : 'none';
+            });
+        }
+
+        // ==================== FOUND ITEMS & BUSINESS RULES ====================
+        function renderFoundTable() {
+            const tbody = document.getElementById('found-items-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (appState.foundItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 italic">No found items logged.</td></tr>';
+                return;
+            }
+
+            appState.foundItems.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+                tr.dataset.category = item.category?.id || '';
+                tr.dataset.status = item.status;
+                tr.dataset.text = `${item.description} ${item.location} ${item.reporter?.name}`.toLowerCase();
+
+                let actionHtml = '';
+                if (item.status === 'AVAILABLE') {
+                    actionHtml = `
+                        <button onclick="updateItemStatus(${item.id}, 'CLAIMED')" class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2.5 py-1 rounded-md shadow-sm transition">
+                            <i class="fa-solid fa-handshake mr-1"></i> Mark Claimed
+                        </button>
+                    `;
+                } else if (item.status === 'CLAIMED') {
+                    actionHtml = `
+                        <button onclick="updateItemStatus(${item.id}, 'RETURNED')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-md shadow-sm transition">
+                            <i class="fa-solid fa-circle-check mr-1"></i> Mark Returned
+                        </button>
+                    `;
+                } else if (item.status === 'RETURNED') {
+                    actionHtml = `<span class="text-xs text-slate-400 italic"><i class="fa-solid fa-lock text-slate-300 mr-1"></i>Item Closed</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs text-slate-500">#${item.id}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium text-xs">${escapeHtml(item.category?.name || 'N/A')}</span></td>
+                    <td class="py-3 px-4 font-medium text-slate-800">${escapeHtml(item.description)}</td>
+                    <td class="py-3 px-4 text-slate-600"><i class="fa-solid fa-location-dot text-emerald-500 mr-1 text-xs"></i>${escapeHtml(item.location)}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full badge-${item.status.toLowerCase()}">${item.status}</span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="font-medium text-slate-700">${escapeHtml(item.reporter?.name || 'N/A')}</span>
+                        <span class="text-[10px] text-slate-400 block">${escapeHtml(item.reporter?.role || '')}</span>
+                    </td>
+                    <td class="py-3 px-4 text-center space-x-1">
+                        ${actionHtml}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterFoundTable() {
+            const query = document.getElementById('found-search-input').value.toLowerCase();
+            const statusFilter = document.getElementById('found-status-filter').value;
+            const catFilter = document.getElementById('found-category-filter').value;
+            const rows = document.querySelectorAll('#found-items-tbody tr');
+
+            rows.forEach(r => {
+                const matchStatus = !statusFilter || r.dataset.status === statusFilter;
+                const matchCat = !catFilter || r.dataset.category === catFilter;
+                const matchText = !query || r.dataset.text.includes(query);
+                r.style.display = (matchStatus && matchCat && matchText) ? '' : 'none';
+            });
+        }
+
+        // Status Update with Business Rules 1 & 2 Enforcement
+        async function updateItemStatus(itemId, newStatus) {
+            if (!appState.currentUser) {
+                showToast('Please select an active user in the top navigation.', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/found-items/${itemId}/status?status=${newStatus}&requesterUserId=${appState.currentUser.id}`, {
+                    method: 'PUT'
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showToast(data.message || `Error ${res.status}: Action rejected`, 'error');
+                    return;
+                }
+
+                showToast(`Success: Item #${itemId} marked as ${newStatus}!`, 'success');
+                await loadInitialData();
+                loadDashboard();
+            } catch (err) {
+                console.error('Error updating status:', err);
+                showToast('Network error while updating status.', 'error');
+            }
+        }
+
+        // ==================== MATCH ENGINE ====================
+        async function runMatchSearch() {
+            const catId = document.getElementById('match-category-select').value;
+            const keyword = document.getElementById('match-keyword-input').value.trim();
+
+            if (!catId) {
+                showToast('Please select a Category to match.', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/matches?categoryId=${catId}&keyword=${encodeURIComponent(keyword)}`);
+                const matches = await res.json();
+                renderMatchResults(matches);
+            } catch (err) {
+                console.error('Error finding matches:', err);
+                showToast('Error executing match search.', 'error');
+            }
+        }
+
+        function findMatchesForReport(reportId, catId, desc) {
+            switchTab('matcher');
+            document.getElementById('match-category-select').value = catId;
+            document.getElementById('match-keyword-input').value = desc.split(' ')[0] || '';
+            runMatchSearch();
+        }
+
+        function renderMatchResults(matches) {
+            const container = document.getElementById('match-results-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (matches.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white p-8 rounded-xl border border-slate-200 text-center">
+                        <i class="fa-solid fa-box-open text-slate-300 text-4xl mb-2"></i>
+                        <h4 class="text-base font-semibold text-slate-700">No Matches Found</h4>
+                        <p class="text-xs text-slate-500">No found items currently match this category and keyword.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let cardsHtml = '';
+            matches.forEach(item => {
+                cardsHtml += `
+                    <div class="bg-white p-5 rounded-xl border border-emerald-200 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded bg-emerald-100 text-emerald-800">${escapeHtml(item.category?.name || 'Category')}</span>
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded badge-${item.status.toLowerCase()}">${item.status}</span>
+                            </div>
+                            <h4 class="text-base font-bold text-slate-800 mb-1">${escapeHtml(item.description)}</h4>
+                            <p class="text-xs text-slate-600 mb-2"><i class="fa-solid fa-location-dot text-emerald-500 mr-1"></i>Location: <strong>${escapeHtml(item.location)}</strong></p>
+                            <p class="text-[11px] text-slate-400">Found By: ${escapeHtml(item.reporter?.name || 'Staff')}</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                            ${item.status === 'AVAILABLE' ? `
+                                <button onclick="updateItemStatus(${item.id}, 'CLAIMED')" class="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg shadow-sm font-medium">
+                                    Claim Item
+                                </button>
+                            ` : `<span class="text-xs text-slate-400 italic">Status: ${item.status}</span>`}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `
+                <div class="mb-3 flex justify-between items-center">
+                    <span class="text-sm font-semibold text-slate-700">Matches Found (${matches.length})</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${cardsHtml}
+                </div>
+            `;
+        }
+
+        // ==================== CATEGORIES GRID ====================
+        function renderCategoriesGrid() {
+            const grid = document.getElementById('categories-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            appState.categories.forEach(c => {
+                grid.innerHTML += `
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg">
+                                <i class="fa-solid fa-tag"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-800">${escapeHtml(c.name)}</h4>
+                                <span class="text-[11px] text-slate-400 font-mono">Category ID: #${c.id}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // ==================== FORM SUBMISSIONS ====================
+        async function handleCreateLostReport(e) {
+            e.preventDefault();
+            if (!appState.currentUser) {
+                showToast('Please select an active reporter in the navbar.', 'warning');
+                return;
+            }
+
+            const payload = {
+                category: { id: parseInt(document.getElementById('form-lost-category').value) },
+                description: document.getElementById('form-lost-desc').value.trim(),
+                location: document.getElementById('form-lost-location').value.trim(),
+                reportDate: document.getElementById('form-lost-date').value,
+                reporter: { id: appState.currentUser.id }
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/lost-reports`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showToast(data.message || 'Error submitting report', 'error');
+                    return;
+                }
+
+                showToast('Lost item report submitted successfully!', 'success');
+                closeModal('modal-new-lost');
+                e.target.reset();
+                document.getElementById('form-lost-date').valueAsDate = new Date();
+                await loadInitialData();
+                loadDashboard();
+            } catch (err) {
+                showToast('Failed to submit lost report.', 'error');
+            }
+        }
+
+        async function handleCreateFoundItem(e) {
+            e.preventDefault();
+            if (!appState.currentUser) {
+                showToast('Please select an active reporter in the navbar.', 'warning');
+                return;
+            }
+
+            const payload = {
+                category: { id: parseInt(document.getElementById('form-found-category').value) },
+                description: document.getElementById('form-found-desc').value.trim(),
+                location: document.getElementById('form-found-location').value.trim(),
+                reporter: { id: appState.currentUser.id }
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/found-items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showToast(data.message || 'Error logging found item', 'error');
+                    return;
+                }
+
+                showToast('Found item logged successfully!', 'success');
+                closeModal('modal-new-found');
+                e.target.reset();
+                await loadInitialData();
+                loadDashboard();
+            } catch (err) {
+                showToast('Failed to log found item.', 'error');
+            }
+        }
+
+        async function handleCreateUser(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('form-user-name').value.trim(),
+                email: document.getElementById('form-user-email').value.trim(),
+                role: document.getElementById('form-user-role').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showToast(data.message || 'Error registering user', 'error');
+                    return;
+                }
+
+                showToast(`User ${data.name} registered successfully!`, 'success');
+                closeModal('modal-new-user');
+                e.target.reset();
+                await loadInitialData();
+                loadDashboard();
+            } catch (err) {
+                showToast('Failed to register user.', 'error');
+            }
+        }
+
+        async function handleCreateCategory(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('form-category-name').value.trim()
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/categories`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showToast(data.message || 'Error creating category', 'error');
+                    return;
+                }
+
+                showToast(`Category '${data.name}' created!`, 'success');
+                closeModal('modal-new-category');
+                e.target.reset();
+                await loadInitialData();
+                loadDashboard();
+            } catch (err) {
+                showToast('Failed to create category.', 'error');
+            }
+        }
+
+        // ==================== NAVIGATION & MODAL HELPERS ====================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className = 'nav-btn px-3 py-1.5 rounded-md text-indigo-200 hover:text-white hover:bg-indigo-800/50 flex items-center gap-2';
+            });
+
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeTab) activeTab.classList.remove('hidden');
+            if (activeNav) activeNav.className = 'nav-btn px-3 py-1.5 rounded-md text-white bg-indigo-800 flex items-center gap-2';
+
+            if (tabId === 'dashboard') loadDashboard();
+        }
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            
+            const bgClass = type === 'success' ? 'bg-emerald-600' :
+                            type === 'error' ? 'bg-rose-600' :
+                            type === 'warning' ? 'bg-yellow-500' : 'bg-indigo-600';
+
+            const iconClass = type === 'success' ? 'fa-circle-check' :
+                              type === 'error' ? 'fa-circle-exclamation' :
+                              type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-info';
+
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm animate-in slide-in-from-right duration-200 pointer-events-auto`;
+            toast.innerHTML = `
+                <i class="fa-solid ${iconClass}"></i>
+                <span class="font-medium">${escapeHtml(message)}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition', 'duration-300');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>
