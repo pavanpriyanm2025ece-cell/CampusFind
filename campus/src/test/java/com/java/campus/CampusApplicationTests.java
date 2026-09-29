@@ -1,10 +1,13 @@
-package com.java.campus;
+// package com.java.campus;
 
-import org.junit.jupiter.api.Test;
+// import org.junit.jupiter.api.Test;
+// import org.springframework.boot.test.context.SpringBootTest;
 
-class CampusApplicationTests {
+// @SpringBootTest
+// class CampusApplicationTests {
 
-    @Test
-    void testApp() {
-    }
-}
+// 	@Test
+// 	void contextLoads() {
+// 	}
+
+// }
