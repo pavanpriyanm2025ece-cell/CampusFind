@@ -1,7 +1,0 @@
-.vscode/
-.idea/
-*.iml
-campus/target/
-target/
-.mvn/wrapper/maven-wrapper.jar
-campus/.mvn/wrapper/maven-wrapper.jar

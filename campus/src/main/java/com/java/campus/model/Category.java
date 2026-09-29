@@ -2,14 +2,9 @@ package com.java.campus.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import lombok.*;
 
 @Entity
 @Table(name = "categories")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class Category {
 
     @Id
